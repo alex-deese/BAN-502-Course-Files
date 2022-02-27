@@ -1,0 +1,224 @@
+---
+output:
+  word_document: default
+  html_document: default
+---
+# **Multiple Linear Regression Assignment**  
+## Alex Deese  
+
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(glmnet)
+library(GGally)
+library(ggcorrplot)
+library(MASS)
+library(car)
+library(lubridate)
+library(lmtest)
+```
+
+## **Task 1: Read in the data from "bike_cleaned.csv**   
+```{r}
+bike = read_csv("bike_cleaned.csv")
+glimpse(bike)
+```
+
+**Convert variables to the correct types:**    
+```{r}
+bike = bike %>% mutate(dteday = mdy(dteday))
+```
+
+```{r}
+bike = bike %>% mutate_if(is.character, as_factor)
+```
+
+```{r}
+bike = bike %>% mutate(hr = as_factor(hr))
+```
+
+## **Why do we convert the “hr” variable into factor? Why not just leave as numbers?**  
+Hr is a categorical variable, not numeric.  We want R to identify "hr" as different levels instead of a numerical, continuous variable.  
+
+## **Task 2: Which of the quantitative variables appears to be best correlated with “count (ignoring registered and casual)?**  
+"temp" is most correlated with "count" (see correlations below)  
+```{r}
+ggcorr(bike, label = "TRUE", label_round = 2)
+
+ggpairs(bike, columns = c(10:16))
+```
+
+## **Task 3: Assess categorical predictor variables relationship with predictor variable.**  
+```{r}
+ggplot(bike,aes(x=hr,y=count)) + geom_boxplot() + theme_bw()
+```
+
+```{r}
+ggplot(bike,aes(x=season,y=count)) + geom_boxplot() + theme_bw()
+```
+
+```{r}
+ggplot(bike,aes(x=mnth,y=count)) + geom_boxplot() + theme_bw()
+```
+
+```{r}
+ggplot(bike,aes(x=holiday,y=count)) + geom_boxplot() + theme_bw()
+```
+
+```{r}
+ggplot(bike,aes(x=weekday,y=count)) + geom_boxplot() + theme_bw()
+```
+
+```{r}
+ggplot(bike,aes(x=workingday,y=count)) + geom_boxplot() + theme_bw()
+```
+
+```{r}
+ggplot(bike,aes(x=weathersit,y=count)) + geom_boxplot() + theme_bw()
+```
+
+## **What categorical variables affect "count"?**  
+**"hr"** affects "count because the boxplot shows large variations of "count" depending on the "hr".  
+
+**"weathersit"** slightly affects "count" because the box plot shows a slight change with a lower "count" the worse the weather is (more "count" during NoPrecip and less "count" during HeavyRecip.  
+
+**"season"** slightly affects "count".  The boxplot shows a higher "count" during Spring and Summer, though not much variation from Winter and Fall.   
+
+**"mnth"** slightly affects "count" with the summer months increasing "count" and winter months decreasing "count".  Though, there is not much variation overall.  
+
+**"holiday"** slighlty affects "count" with more "count" on Non-holidays vs holidays.  However, there is not much variation between the two.  
+
+**"weekday"** does not affect "count".  Most weekdays have the same (or very close to the same) "count".  
+
+**"workingday"** does not significantly affect "count".  Workingday and NotWorkingDay have almost the same "count".  
+
+## **Task 4: Choose the best variable from the correlation and build a model with that variable as the single predictor of "count".**  
+
+```{r}
+bike_recipe = recipe(count ~ hr, bike) %>%
+  step_dummy(hr)
+
+lm_model =
+  linear_reg() %>%
+  set_engine("lm")
+
+lm_wflow =
+  workflow() %>%
+  add_model(lm_model) %>%
+  add_recipe(bike_recipe)
+
+lm_fit = fit(lm_wflow, bike)
+```
+
+```{r}
+summary(lm_fit$fit$fit$fit)
+```
+This model is a little cumbersome to read due to the large amount of hr levels.  The model is using hr 0 as the baseline for the y-intercept.  All levels of "hr" are significant predictors of "count". The Adjusted R-Squared is 0.5008 which is not terrible, but could be better.
+
+## **Task 5: Create a multiple linear regression model to predict the "count" variable, excluding "instant", "dteday", "registers", and "casual".**  
+The resulting model has a higher Adjusted R-Squared value at 0.6312 vs the model that included only "count" and "hr".  However, several variable levels are not significant.  For example, many of the "mnth" levels are not significant, though some are.  We also receive a message of "Coefficients: (1 not defined because of singularities)" meaning that two or more predictor variables have a perfect linear relationship. This caused a response of "NA" for "workingday". We would need to identify which variables have the perfect correlation and remove one of them in order to use this model. See the model below.  
+```{r}
+bike_recipe2 = recipe(count ~., bike) %>%
+  step_rm(instant,dteday,registered,casual) %>%
+  step_dummy(all_nominal())
+
+lm_model2 =
+  linear_reg() %>%
+  set_engine("lm")
+
+lm_wflow2 =
+  workflow() %>%
+  add_model(lm_model) %>%
+  add_recipe(bike_recipe2)
+
+lm_fit2 = fit(lm_wflow2, bike)
+```
+
+```{r}
+summary(lm_fit2$fit$fit$fit)
+```
+
+## **Task 6: Comment on multicollinearity in your model from Task 5**  
+Since we received the message ""Coefficients: (1 not defined because of singularities)" we should identify what variables have a linear correlation using the vif function below.  When trying to use this function, we get a result of "there are aliased coefficients in the model" meaning that two or more of our variables have a perfect linear correlation.    
+```{r}
+#car::vif(lm_fit2$fit$fit$fit) #when trying to use the vif function, we get a result of "there are aliased coefficients in the model" meaning that two or more of our variables have a perfect linear correlation.
+```
+
+```{r}
+bike_recipe3 = recipe(count ~., bike) %>% #making a new recipe without workingday included
+  step_rm(instant,dteday,registered,casual,workingday) %>%
+  step_dummy(all_nominal())
+
+lm_model3 =
+  linear_reg() %>%
+  set_engine("lm")
+
+lm_wflow3 =
+  workflow() %>%
+  add_model(lm_model) %>%
+  add_recipe(bike_recipe3)
+
+lm_fit3 = fit(lm_wflow3, bike)
+```
+
+```{r} 
+summary(lm_fit3$fit$fit$fit)
+```
+
+```{r}
+car::vif(lm_fit3$fit$fit$fit) #rerunning the vif formula to check for further multicollinearity.
+```
+There are still many variables that are returning a vif value of >5. temp and atemp have a close correlation to each other so we should drop one of those.  season and month both have high vif values and should not be included in the model.  
+
+## **Task 7: Create the best multiple linear regression model that you can to predict the "count" variable, excluding "instant", "dteday", "registered", and "casual".**  
+
+**Manually Built Model removing variables with a high vif value**  
+```{r}
+bike_recipe_final = recipe(count ~.,bike) %>%
+  step_rm(instant,dteday,registered,casual,workingday,atemp,season,mnth,) %>%
+  step_dummy(all_nominal())
+
+lm_model_final =
+  linear_reg() %>%
+  set_engine("lm")
+
+lm_wflow_final =
+  workflow() %>%
+  add_model(lm_model_final) %>%
+  add_recipe(bike_recipe_final)
+
+lm_fit_final = fit(lm_wflow_final, bike)
+```
+
+```{r}
+summary(lm_fit_final$fit$fit$fit)
+```
+
+
+**Stepwise Forward Approach**   
+```{r}
+bike2 = bike %>% dplyr::select("season","mnth","hr","holiday","weekday","workingday","weathersit","temp","atemp","hum","windspeed","count")
+
+allmod = lm(count ~., bike2)
+```
+
+```{r}
+backmod = stepAIC(allmod, direction = "backward", trace = TRUE)
+summary(backmod)
+```
+
+**Stepwise Backward Approach**  
+```{r}
+emptymod = lm(count ~1, bike2)
+```
+
+```{r}
+forwarded = stepAIC(emptymod, direction = "forward", scope=list(upper=allmod,lower=emptymod), trace=TRUE)
+
+summary(forwarded)
+```
+
+**Analysis of the manual and stepwise methods, resulting models, and multicollinearity**  
+Both the stepwise forward and backward approaches resulted in the same multiple linear regression model.  Each model included all variables except for "workingday", had an adjusted r-squared value of 0.6312, and an AIC of 163,480.  The variables that I expected to have a negative affect on count are negative such as early morning hours, light/heavy precip, humidity, months that tend to be hot/cold, and wind speed.  Variables that I expect to have a positive affect on count are positive such as hours mid-day or afternoon, atemp, temp, and spring/summer/fall (as opposed to winter).  The variables with a higher correlation to count are showing significant in the model summary, and some variables that have a lower correlation to count are showing as not significant.  
+
+However, I prefer the manual model that I created.  The negative or positive values for the manual model make sense just as they did in the stepwise methods.  However, many of the variables that remain in the stepwise method have vif values >5 so there may be some multicollinearity involved.  My manual model (lm_fit_final) removes these variables.  It has a slightly lower r-squared value of 0.6107 but I believe would be more accurate than the stepwise models due to removing multicollinearity issues.  

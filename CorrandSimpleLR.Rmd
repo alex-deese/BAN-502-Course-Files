@@ -1,0 +1,128 @@
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(GGally)
+library(lmtest)
+
+```
+
+```{r}
+air = airquality
+```
+
+## **Task 1: Describe this dataset. How many variables and observations are there? Is there any missing data? Which variable is likely to be the response (Y) variable**  
+#There are 153 observations and 6 variables.  There are missing data points for Ozone and Solar.R throughout. Ozone is likely to be the response Y variable.  
+
+## **Task 2: Remove columns with missing data**  
+
+```{r}
+air2 = drop_na(air)
+```
+
+## **How many rows and columns remain in this new (air2) data frame?**  
+# There are 111 rows and 6 columns.  
+
+## **Task 3**  
+Use ggpairs to develop a visualization of and and to calculate correlation for the combination of variables in this dataset**  
+
+```{r}
+ggpairs(air2)
+```
+
+Use the “ggcorr” function to develop a correlation matrix for the variables.
+
+```{r}
+ggcorr(air,label=TRUE)
+```
+## **Which variable is most strongly correlated with the “Ozone” variable?**  
+Temp at 0.7  
+## **Which variable is least strongly correlated with the “Ozone” variable?**  
+Day at 0.  
+
+## **Task 4: Plot Temp vs Ozone  
+```{r}
+ggplot(air2,aes(x=Temp, y=Ozone)) + geom_point()
+```
+## **Describe the relationship between “Temp” and “Ozone**  
+There is a positive coorelation between temp and ozone.  As temperature (x) increases, ozone (y) increases. 
+
+## ** Task 5: Use tidymodels to create a linear regression model using “Temp” to predict “Ozone**   
+```{r}
+modl = lm(Ozone ~ Temp, air2)
+summary(modl)
+```
+## ** a) Discuss the quality of this model**  
+R squared is 0.488  and adjusted in about the same. Nothing to note without comparing to other predictors.  
+Slope is 2.4391 (positive regression line).  
+pvalue is <2e-16 so it's way smaller than 0.05 so the predictor variable is significant.  
+
+Build Tidymodel recipe  
+```{r}
+modl_recipe = recipe(Ozone ~ Temp, air2)
+modl_recipe
+```
+
+```{r}
+lm_model =
+  linear_reg() %>%
+  set_engine("lm")
+```
+
+```{r}
+lm_workflow =
+  workflow() %>%
+  add_model(lm_model) %>%
+  add_recipe(modl_recipe)
+```
+
+```{r}
+lm_fit = fit(lm_workflow,air2)
+```
+
+## ** b) Use the code below to generate 95% confidence intervals for the coefficients**  
+```{r}
+confint(lm_fit$fit$fit$fit)
+```
+## ***. In what range does the slope coefficient likely fall?**   
+1.96 and 2.91  
+
+## **Task 6: Redo task 4 to include the regression line**  
+```{r}
+ggplot(air2,aes(x=Temp, y=Ozone)) + geom_point() + geom_smooth(method = "lm", se = FALSE)
+```
+
+## **Task 7: Develop a prediction for “Ozone” when “Temp” is 80**  
+
+There are two ways to do this: Manually write the formula below (probably shouldn't do that) and the below method.  
+```{r}
+testdata = data.frame(Temp = c(80))
+predict(lm_fit, new_data = testdata)
+```
+Prediction for Ozone when temp is 80 is 47.48272  
+
+## ** Task 8: Perform appropriate model diagnostics to verify whether or not the model appears to meet the four linear regression model assumptions**  
+
+#1: The predictor and response variable have a linear relationship  
+Based on the plotted data, the predictor and response variable have a linear relationship.  
+
+#2: Model errors (residuals) are independent (recall that a residual is the difference between a predicted value and the actual value)  
+```{r}
+dwtest(lm_fit$fit$fit$fit)
+```
+Using the DW test, the p.value is much higher than 0.05, determining that the variables are independent.
+
+#3 Model residuals exhibit constant variance   
+```{r}
+air3 = air2 %>% mutate(resid1 = lm_fit$fit$fit$fit$residuals)
+ggplot(air3,aes(x=Temp, y=resid1)) + geom_point()
+```
+There's a slight pattern in the residuals - a slight U shape.
+
+#4 Model residuals are Normally-distributed  
+```{r}
+ggplot(air3, aes(x=resid1)) + geom_histogram()
+```
+There is a dip in the middle of the histogram but the data is distributed somewhat normally.
+
+
+

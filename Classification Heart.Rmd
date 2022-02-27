@@ -1,0 +1,264 @@
+---
+output:
+  word_document: default
+  html_document: default
+---
+## **Classification Trees**  
+**Alex Deese**  
+
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(rattle)
+library(RColorBrewer)
+```
+
+```{r}
+heart = read_csv("heart_disease-1.csv")
+```
+
+```{r}
+heart = heart %>% mutate(Sex = as_factor(Sex)) %>%
+  mutate(ChestPainType = as_factor(ChestPainType)) %>%
+  mutate(RestingECG = as_factor(RestingECG)) %>%
+  mutate(ExerciseAngina = as_factor(ExerciseAngina)) %>%
+  mutate(HeartDisease = as_factor(HeartDisease)) %>%
+  mutate(HeartDisease = fct_recode(HeartDisease, "No" = "0", "Yes" = "1"))
+```
+
+## **Task 1: Split the data into training and testing sets**  
+```{r}
+set.seed(12345)
+heart_split = initial_split(heart, prop = 0.70, strata = HeartDisease)
+train = training(heart_split)
+test = testing(heart_split)
+
+```
+
+## **Task 2: Create a classification tree to predict "HeartDisease" in the training set (using all of the other variables as parameters). Plot the tree.**  
+```{r}
+heart_recipe = recipe(HeartDisease ~., train)
+
+tree_model = decision_tree() %>% 
+  set_engine("rpart", model = TRUE) %>%
+  set_mode("classification")
+
+heart_wflow = 
+  workflow() %>% 
+  add_model(tree_model) %>% 
+  add_recipe(heart_recipe)
+
+heart_fit = fit(heart_wflow, train)
+```
+
+```{r}
+tree = heart_fit %>% 
+  extract_fit_parsnip() %>% 
+  pluck("fit") 
+```
+
+```{r}
+fancyRpartPlot(tree)
+```
+
+## **Task 3: Examine the complexity parameter (cp) values tried by R. Which cp value is optimal?**   
+
+0.0174 is the optimal cp value because it minimizes the xerror value.  
+
+```{r}
+heart_fit$fit$fit$fit$cptable
+```
+
+## **Task 4: Use a tuning grid (as we did in the Titanic problem) to try 25 different values for the complexity parameter (cp)**  
+
+```{r Create Folds}
+set.seed(123)
+folds = vfold_cv(train, v = 5)
+```
+
+```{r Tuning}
+heart_recipe2 = recipe(HeartDisease ~., train) %>%
+  step_dummy(all_nominal(),-all_outcomes())
+
+tree_model2 = decision_tree(cost_complexity = tune()) %>% 
+  set_engine("rpart", model = TRUE) %>%
+  set_mode("classification")
+
+tree_grid = grid_regular(cost_complexity(),
+                          levels = 25)
+
+heart_wflow2 = 
+  workflow() %>% 
+  add_model(tree_model2) %>% 
+  add_recipe(heart_recipe2)
+
+tree_res = 
+  heart_wflow2 %>% 
+  tune_grid(
+    resamples = folds,
+    grid = tree_grid
+    )
+
+tree_res
+```
+
+```{r}
+tree_res %>%
+  collect_metrics() %>%
+  ggplot(aes(cost_complexity, mean)) +
+  geom_line(size = 1.5, alpha = 0.6) +
+  geom_point(size = 2) +
+  facet_wrap(~ .metric, scales = "free", nrow = 2)
+
+best_tree = tree_res %>%
+  select_best("accuracy")
+
+best_tree
+```
+## **Task 5: Which cp value yields the “optimal” accuracy value?**  
+
+0.0422 yields the optimal accuracy value.  
+
+## **Task 6: Plot the tree that corresponds to the cp value from Task 6. Don’t forget to finalize your workflow and generate your final fit before trying to plot**  
+
+```{r}
+final_wf = 
+  heart_wflow2 %>% 
+  finalize_workflow(best_tree)
+```
+
+```{r}
+final_fit = fit(final_wf, train)
+
+tree_final = final_fit %>% 
+  extract_fit_parsnip() %>% 
+  pluck("fit")
+
+fancyRpartPlot(tree_final)
+```
+
+## **Task 7: What is the accuracy of the “tree” that you generated in Task 6?**  
+The accuracy of the "tree" generated in Task 6 is 0.8396 on the training set.    
+
+```{r Pred on Train Data}
+treepred = predict(final_fit, train, type = "class")
+head(treepred)
+```
+
+```{r Confusion Matrix}
+confusionMatrix(treepred$.pred_class,train$HeartDisease,positive="Yes")
+```
+
+## **Task 8: Read in the “Blood.csv” dataset.**  
+```{r}
+Blood = read_csv("Blood.csv")
+```
+
+```{r}
+Blood = Blood %>% mutate(DonatedMarch = as_factor(DonatedMarch)) %>%
+  mutate(DonatedMarch = fct_recode(DonatedMarch, "No" = "0", "Yes" = "1"))
+```
+
+## **Task 9: Split the dataset into training (70%) and testing (30%) sets.What cp value appears to be “optimal” to maximize accuracy?**   
+
+0.0178 appears to be the optimal cp value to maximize accuracy.  
+
+```{r}
+set.seed(1234)
+blood_split = initial_split(Blood, prop = 0.70, strata = DonatedMarch)
+train2 = training(blood_split)
+test2 = testing(blood_split)
+```
+
+```{r folds}
+set.seed(1234)
+folds2 = vfold_cv(train2, v = 5)
+```
+
+```{r}
+blood_recipe = recipe(DonatedMarch ~., train2) %>%
+  step_dummy(all_nominal(),-all_outcomes())
+
+tree_model3 = decision_tree(cost_complexity = tune()) %>% 
+  set_engine("rpart", model = TRUE) %>%
+  set_mode("classification")
+
+tree_grid = grid_regular(cost_complexity(),
+                          levels = 25)
+
+blood_wflow = 
+  workflow() %>% 
+  add_model(tree_model3) %>% 
+  add_recipe(blood_recipe)
+
+tree_res2 = 
+  blood_wflow %>% 
+  tune_grid(
+    resamples = folds2,
+    grid = tree_grid
+    )
+
+tree_res2
+```
+
+```{r}
+tree_res2 %>%
+  collect_metrics() %>%
+  ggplot(aes(cost_complexity, mean)) +
+  geom_line(size = 1.5, alpha = 0.6) +
+  geom_point(size = 2) +
+  facet_wrap(~ .metric, scales = "free", nrow = 2)
+
+best_tree2 = tree_res2 %>%
+  select_best("accuracy")
+
+best_tree2
+```
+
+## **Task 10: Plot the tree with optimal cp from Task 9.**   
+
+```{r}
+final_wf2 = 
+  blood_wflow %>% 
+  finalize_workflow(best_tree2)
+```
+
+```{r}
+final_fit2 = fit(final_wf2, train2)
+
+tree_final2 = final_fit2 %>% 
+  extract_fit_parsnip() %>% 
+  pluck("fit")
+
+fancyRpartPlot(tree_final2)
+```
+
+## **Task 11: Determine the accuracy of the tree from Task 10 on the training and testing sets. Comment on the tree’s performance on these sets.**  
+
+The accuracy of the tree is 0.8069 on the train2 dataset which is better than the 0.7629 naive value. The difference between our model and the naive model is statistically significant at 0.0092, meaning that our model is more accuracte than the naive model.  
+
+Accuracy is 0.7822 on the test2 dataset which is better than the naive of 0.76. The difference in our model and the naive model is not statistically significant with a value of 0.2434.  However, our test2 dataset only has 276 observations and 399 of those are "No", so it is fairly small.  
+
+The accuracy is close for both the train2 and test2 datasets, though the test2 data set is slightly lower.  This is not a bad model.  
+
+```{r train pred}
+treepred2 = predict(final_fit2, train2, type = "class")
+head(treepred2)
+```
+
+```{r train accuracy}
+confusionMatrix(treepred2$.pred_class,train2$DonatedMarch,positive="Yes")
+```
+
+```{r test pred}
+treepred_test = predict(final_fit2, test2, type = "class")
+head(treepred_test)
+```
+
+```{r test accuracy}
+confusionMatrix(treepred_test$.pred_class,test2$DonatedMarch,positive="Yes")
+```
+

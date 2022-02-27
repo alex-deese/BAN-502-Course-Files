@@ -1,0 +1,480 @@
+---
+output:
+  word_document: default
+  html_document: default
+---
+## **Course Project Phase 1**  
+**Alex Deese**  
+
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(caret)
+library(gridExtra)
+library(vip)
+library(ranger)
+library(skimr)
+library(esquisse)
+```
+
+```{r Load Data Set}
+ames_student <- read_csv("ames_student.csv")
+```
+
+```{r Summary}
+#summary(ames_student)
+```
+
+```{r Convert to Factors}
+ames_student = ames_student %>% mutate_if(is.character,as_factor) %>%
+  mutate(BsmtFin_Type_1 = as_factor(BsmtFin_Type_1)) %>%
+  mutate(Bsmt_Full_Bath = as_factor(Bsmt_Full_Bath)) %>%
+  mutate(Bsmt_Half_Bath = as_factor(Bsmt_Half_Bath)) %>%
+  mutate(Full_Bath = as_factor(Full_Bath)) %>%
+  mutate(Half_Bath = as_factor(Half_Bath)) %>%
+  mutate(BsmtFin_SF_1 = as_factor(BsmtFin_SF_1)) %>%
+  mutate(Bedroom_AbvGr = as_factor(Bedroom_AbvGr)) %>%
+  mutate(Kitchen_AbvGr = as_factor(Kitchen_AbvGr)) %>%
+  mutate(TotRms_AbvGrd = as_factor(TotRms_AbvGrd)) %>%
+  mutate(Fireplaces = as_factor(Fireplaces)) %>%
+  mutate(Garage_Cars = as_factor(Garage_Cars)) %>%
+  mutate(Mo_Sold = as_factor(Mo_Sold)) %>%
+  mutate(Year_Sold = as_factor(Year_Sold)) %>%
+  mutate(Garage_Area = as.numeric(Garage_Area))
+```
+
+```{r Look for Missingness}
+#skim(ames_student)
+```
+
+```{r}
+p1 = ggplot(ames_student, aes(x = MS_SubClass, fill = Above_Median)) + geom_bar(position = "fill") + theme(axis.text.x = element_text(angle = 90))
+
+p2 = ggplot(ames_student, aes(x = MS_Zoning, fill = Above_Median)) + geom_bar(position = "fill")+ theme(axis.text.x = element_text(angle = 90))
+
+p1
+p2
+
+```
+
+```{r}
+p3 = ggplot(ames_student, aes(x = Street, fill = Above_Median)) + geom_bar(position = "fill")+ theme(axis.text.x = element_text(angle = 90))
+
+p4 = ggplot(ames_student, aes(x = Alley, fill = Above_Median)) + geom_bar(position = "fill")+ theme(axis.text.x = element_text(angle = 90))
+
+grid.arrange(p3,p4)
+```
+
+```{r}
+p5 = ggplot(ames_student, aes(x = Lot_Shape, fill = Above_Median)) + geom_bar(position = "fill") + theme(axis.text.x = element_text(angle = 90))
+
+p6 = ggplot(ames_student, aes(x = Land_Contour, fill = Above_Median)) + geom_bar(position = "fill")+ theme(axis.text.x = element_text(angle = 90))
+
+p7 = ggplot(ames_student, aes(x = Utilities, fill = Above_Median)) + geom_bar(position = "fill")+ theme(axis.text.x = element_text(angle = 90))
+
+p8 = ggplot(ames_student, aes(x = Lot_Config, fill = Above_Median)) + geom_bar(position = "fill")+ theme(axis.text.x = element_text(angle = 90))
+
+grid.arrange(p5,p6,p7,p8)
+```
+
+```{r}
+p9 = ggplot(ames_student, aes(x = Land_Slope, fill = Above_Median)) + geom_bar(position = "fill") + theme(axis.text.x = element_text(angle = 90))
+
+p10 = ggplot(ames_student, aes(x = Neighborhood, fill = Above_Median)) + geom_bar(position = "fill")+ theme(axis.text.x = element_text(angle = 90))
+
+p11 = ggplot(ames_student, aes(x = Condition_1, fill = Above_Median)) + geom_bar(position = "fill")+ theme(axis.text.x = element_text(angle = 90))
+
+p12 = ggplot(ames_student, aes(x = Condition_2, fill = Above_Median)) + geom_bar(position = "fill")+ theme(axis.text.x = element_text(angle = 90))
+
+grid.arrange(p9,p11,p12)
+```
+
+```{r}
+p10
+```
+
+```{r}
+p13 = ggplot(ames_student, aes(x = Bldg_Type, fill = Above_Median)) + geom_bar(position = "fill") + theme(axis.text.x = element_text(angle = 90))
+
+p14 = ggplot(ames_student, aes(x = House_Style, fill = Above_Median)) + geom_bar(position = "fill")+ theme(axis.text.x = element_text(angle = 90))
+
+p15 = ggplot(ames_student, aes(x = Overall_Qual, fill = Above_Median)) + geom_bar(position = "fill")+ theme(axis.text.x = element_text(angle = 90))
+
+grid.arrange(p13,p14,p15)
+```
+
+```{r}
+p17 = ggplot(ames_student, aes(x = Overall_Cond, fill = Above_Median)) + geom_bar(position = "fill") + theme(axis.text.x = element_text(angle = 90))
+
+p18 = ggplot(ames_student, aes(x = Roof_Style, fill = Above_Median)) + geom_bar(position = "fill")+ theme(axis.text.x = element_text(angle = 90))
+
+p19 = ggplot(ames_student, aes(x = Roof_Matl, fill = Above_Median)) + geom_bar(position = "fill")+ theme(axis.text.x = element_text(angle = 90))
+
+p20 = ggplot(ames_student, aes(x = Exterior_1st, fill = Above_Median)) + geom_bar(position = "fill")+ theme(axis.text.x = element_text(angle = 90))
+
+grid.arrange(p17,p18,p19,p20)
+```
+
+```{r}
+p21 = ggplot(ames_student, aes(x = Exterior_2nd, fill = Above_Median)) + geom_bar(position = "fill") + theme(axis.text.x = element_text(angle = 90))
+
+p22 = ggplot(ames_student, aes(x = Mas_Vnr_Type, fill = Above_Median)) + geom_bar(position = "fill")+ theme(axis.text.x = element_text(angle = 90))
+
+p23 = ggplot(ames_student, aes(x = Exter_Qual, fill = Above_Median)) + geom_bar(position = "fill")+ theme(axis.text.x = element_text(angle = 90))
+
+p24 = ggplot(ames_student, aes(x = Exter_Cond, fill = Above_Median)) + geom_bar(position = "fill")+ theme(axis.text.x = element_text(angle = 90))
+
+grid.arrange(p21,p22,p23,p24)
+```
+
+```{r}
+p25 = ggplot(ames_student, aes(x = Foundation, fill = Above_Median)) + geom_bar(position = "fill") + theme(axis.text.x = element_text(angle = 90))
+
+p26 = ggplot(ames_student, aes(x = Bsmt_Qual, fill = Above_Median)) + geom_bar(position = "fill")+ theme(axis.text.x = element_text(angle = 90))
+
+p27 = ggplot(ames_student, aes(x = Bsmt_Cond, fill = Above_Median)) + geom_bar(position = "fill")+ theme(axis.text.x = element_text(angle = 90))
+
+p28 = ggplot(ames_student, aes(x = Bsmt_Exposure, fill = Above_Median)) + geom_bar(position = "fill")+ theme(axis.text.x = element_text(angle = 90))
+
+grid.arrange(p25,p26,p27,p28)
+```
+
+```{r}
+p29 = ggplot(ames_student, aes(x = BsmtFin_Type_1, fill = Above_Median)) + geom_bar(position = "fill") + theme(axis.text.x = element_text(angle = 90))
+
+p30 = ggplot(ames_student, aes(x = BsmtFin_SF_1, fill = Above_Median)) + geom_bar(position = "fill")+ theme(axis.text.x = element_text(angle = 90))
+
+p31 = ggplot(ames_student, aes(x = BsmtFin_Type_2, fill = Above_Median)) + geom_bar(position = "fill")+ theme(axis.text.x = element_text(angle = 90))
+
+p32 = ggplot(ames_student, aes(x = Heating, fill = Above_Median)) + geom_bar(position = "fill")+ theme(axis.text.x = element_text(angle = 90))
+
+grid.arrange(p29,p30,p31,p32)
+```
+
+```{r}
+p33 = ggplot(ames_student, aes(x = Heating_QC, fill = Above_Median)) + geom_bar(position = "fill") + theme(axis.text.x = element_text(angle = 90))
+
+p34 = ggplot(ames_student, aes(x = Central_Air, fill = Above_Median)) + geom_bar(position = "fill")+ theme(axis.text.x = element_text(angle = 90))
+
+p35 = ggplot(ames_student, aes(x = Electrical, fill = Above_Median)) + geom_bar(position = "fill")+ theme(axis.text.x = element_text(angle = 90))
+
+p36 = ggplot(ames_student, aes(x = Bsmt_Full_Bath, fill = Above_Median)) + geom_bar(position = "fill")+ theme(axis.text.x = element_text(angle = 90))
+
+grid.arrange(p33,p34,p35,p36)
+```
+
+```{r}
+p37 = ggplot(ames_student, aes(x = Bsmt_Half_Bath, fill = Above_Median)) + geom_bar(position = "fill") + theme(axis.text.x = element_text(angle = 90))
+
+p38 = ggplot(ames_student, aes(x = Full_Bath, fill = Above_Median)) + geom_bar(position = "fill")+ theme(axis.text.x = element_text(angle = 90))
+
+p39 = ggplot(ames_student, aes(x = Half_Bath, fill = Above_Median)) + geom_bar(position = "fill")+ theme(axis.text.x = element_text(angle = 90))
+
+p40 = ggplot(ames_student, aes(x = Bedroom_AbvGr, fill = Above_Median)) + geom_bar(position = "fill")+ theme(axis.text.x = element_text(angle = 90))
+
+grid.arrange(p37,p38,p39,p40)
+```
+
+```{r}
+p41 = ggplot(ames_student, aes(x = Kitchen_AbvGr, fill = Above_Median)) + geom_bar(position = "fill") + theme(axis.text.x = element_text(angle = 90))
+
+p42 = ggplot(ames_student, aes(x = Kitchen_Qual, fill = Above_Median)) + geom_bar(position = "fill")+ theme(axis.text.x = element_text(angle = 90))
+
+p43 = ggplot(ames_student, aes(x = TotRms_AbvGrd, fill = Above_Median)) + geom_bar(position = "fill")+ theme(axis.text.x = element_text(angle = 90))
+
+p44 = ggplot(ames_student, aes(x = Functional, fill = Above_Median)) + geom_bar(position = "fill")+ theme(axis.text.x = element_text(angle = 90))
+
+grid.arrange(p41,p42,p43,p44)
+```
+
+```{r}
+p45 = ggplot(ames_student, aes(x = Fireplaces, fill = Above_Median)) + geom_bar(position = "fill") + theme(axis.text.x = element_text(angle = 90))
+
+p46 = ggplot(ames_student, aes(x = Fireplace_Qu, fill = Above_Median)) + geom_bar(position = "fill")+ theme(axis.text.x = element_text(angle = 90))
+
+p47 = ggplot(ames_student, aes(x = Garage_Type, fill = Above_Median)) + geom_bar(position = "fill")+ theme(axis.text.x = element_text(angle = 90))
+
+p48 = ggplot(ames_student, aes(x = Garage_Finish, fill = Above_Median)) + geom_bar(position = "fill")+ theme(axis.text.x = element_text(angle = 90))
+
+grid.arrange(p45,p46,p47,p48)
+```
+
+```{r}
+p49 = ggplot(ames_student, aes(x = Garage_Cars, fill = Above_Median)) + geom_bar(position = "fill") + theme(axis.text.x = element_text(angle = 90))
+
+p51 = ggplot(ames_student, aes(x = Garage_Qual, fill = Above_Median)) + geom_bar(position = "fill")+ theme(axis.text.x = element_text(angle = 90))
+
+p52 = ggplot(ames_student, aes(x = Garage_Cond, fill = Above_Median)) + geom_bar(position = "fill")+ theme(axis.text.x = element_text(angle = 90))
+
+grid.arrange(p49,p51,p52)
+```
+
+```{r}
+p53 = ggplot(ames_student, aes(x = Paved_Drive, fill = Above_Median)) + geom_bar(position = "fill") + theme(axis.text.x = element_text(angle = 90))
+
+p54 = ggplot(ames_student, aes(x = Pool_QC, fill = Above_Median)) + geom_bar(position = "fill")+ theme(axis.text.x = element_text(angle = 90))
+
+p55 = ggplot(ames_student, aes(x = Fence, fill = Above_Median)) + geom_bar(position = "fill")+ theme(axis.text.x = element_text(angle = 90))
+
+p56 = ggplot(ames_student, aes(x = Misc_Feature, fill = Above_Median)) + geom_bar(position = "fill")+ theme(axis.text.x = element_text(angle = 90))
+
+grid.arrange(p53,p54,p55,p56)
+```
+
+```{r}
+p57 = ggplot(ames_student, aes(x = Mo_Sold, fill = Above_Median)) + geom_bar(position = "fill") + theme(axis.text.x = element_text(angle = 90))
+
+p58 = ggplot(ames_student, aes(x = Year_Sold, fill = Above_Median)) + geom_bar(position = "fill")+ theme(axis.text.x = element_text(angle = 90))
+
+p59 = ggplot(ames_student, aes(x = Sale_Type, fill = Above_Median)) + geom_bar(position = "fill")+ theme(axis.text.x = element_text(angle = 90))
+
+p60 = ggplot(ames_student, aes(x = Sale_Condition, fill = Above_Median)) + geom_bar(position = "fill")+ theme(axis.text.x = element_text(angle = 90))
+
+grid.arrange(p57,p58,p59,p60)
+```
+
+```{r}
+p61 = ggplot(ames_student, aes(x = Above_Median, y = Lot_Frontage)) + geom_boxplot()
+
+p62 = ggplot(ames_student, aes(x = Above_Median, y = Lot_Area)) + geom_boxplot()
+
+p63 = ggplot(ames_student, aes(x = Above_Median, y = Year_Built)) + geom_boxplot()
+
+p64 = ggplot(ames_student, aes(x = Above_Median, y = Year_Remod_Add)) + geom_boxplot()
+
+grid.arrange(p61,p62,p63,p64)
+
+```
+
+```{r}
+p65 = ggplot(ames_student, aes(x = Above_Median, y = Mas_Vnr_Area)) + geom_boxplot()
+
+p66 = ggplot(ames_student, aes(x = Above_Median, y = BsmtFin_SF_2)) + geom_boxplot()
+
+p67 = ggplot(ames_student, aes(x = Above_Median, y = Bsmt_Unf_SF)) + geom_boxplot()
+
+p68 = ggplot(ames_student, aes(x = Above_Median, y = Total_Bsmt_SF)) + geom_boxplot()
+
+grid.arrange(p65,p66,p67,p68)
+```
+
+```{r}
+p69 = ggplot(ames_student, aes(x = Above_Median, y = First_Flr_SF)) + geom_boxplot()
+
+p70 = ggplot(ames_student, aes(x = Above_Median, y = Second_Flr_SF)) + geom_boxplot()
+
+p71 = ggplot(ames_student, aes(x = Above_Median, y = Low_Qual_Fin_SF)) + geom_boxplot()
+
+p72 = ggplot(ames_student, aes(x = Above_Median, y = Gr_Liv_Area)) + geom_boxplot()
+
+grid.arrange(p69,p70,p71,p72)
+```
+
+```{r}
+p73 = ggplot(ames_student, aes(x = Above_Median, y = Wood_Deck_SF)) + geom_boxplot()
+
+p74 = ggplot(ames_student, aes(x = Above_Median, y = Open_Porch_SF)) + geom_boxplot()
+
+p75 = ggplot(ames_student, aes(x = Above_Median, y = Enclosed_Porch)) + geom_boxplot()
+
+p76 = ggplot(ames_student, aes(x = Above_Median, y = Three_season_porch)) + geom_boxplot()
+
+grid.arrange(p73,p74,p75,p76)
+```
+
+```{r}
+p77 = ggplot(ames_student, aes(x = Above_Median, y = Screen_Porch)) + geom_boxplot()
+
+p78 = ggplot(ames_student, aes(x = Above_Median, y = Pool_Area)) + geom_boxplot()
+
+p79 = ggplot(ames_student, aes(x = Above_Median, y = Misc_Val)) + geom_boxplot()
+
+p80 = ggplot(ames_student, aes(x = Above_Median, y = Longitude)) + geom_boxplot()
+
+grid.arrange(p77,p78,p79,p80)
+```
+
+```{r}
+p81 = ggplot(ames_student, aes(x = Above_Median, y = Latitude)) + geom_boxplot()
+p82 = ggplot(ames_student, aes(x = Above_Median, y = Garage_Area)) + geom_boxplot()
+
+grid.arrange(p81,p82)
+```
+
+```{r select variables and recode names}
+AmesFinal = ames_student %>%
+  select(Neighborhood, Sale_Type, Year_Built, Overall_Qual, Exter_Qual, Kitchen_Qual, Full_Bath, TotRms_AbvGrd, MS_SubClass, Above_Median) %>%
+  mutate(Neighborhood = fct_recode(Neighborhood, "Bloomington Heights" = "Bloomington_Heights","Clear Creek" = "Clear_Creek", "College Creek" = "College_Creek", "Green Hills" = "Green_Hills", "Iowa DOT & Railroad" = "Iowa_DOT_and_Rail_Road", "Meadow Village" = "Meadow_Village", "North Ames" = "North_Ames", "Northpark Villa" = "Northpark_Villa", "Northridge Heights" = "Northridge_Heights", "Northwest Ames" = "Northwest_Ames", "Old Town" = "Old_Town", "Sawyer West" = "Sawyer_West", "S & W of ISU" = "South_and_West_of_Iowa_State_University", "Stone Brook" = "Stone_Brook")) %>%
+  mutate(Overall_Qual = fct_recode(Overall_Qual, "Above Average" = "Above_Average", "Below Average" = "Below_Average", "Very Excellent" = "Very_Excellent", "Very Good" = "Very_Good", "Very Poor" = "Very_Poor")) %>%
+  mutate(Sale_Type = fct_recode(Sale_Type, "Warranty - Conventional" = "WD", "Warranty - Cash" = "CWD", "Warranty - VA Loan" = "VWD", "Estate" = "COD", "15% Down Reg Term" = "Con", "Low Down Low Interest" = "ConLw", "Low Interest" = "ConLI", "Low Down" = "ConLD", "Other" = "Oth")) %>%
+  mutate(MS_SubClass = fct_recode(MS_SubClass, "Duplex" = "Duplex_All_Styles_and_Ages", "1.5 Story Finished" = "One_and_Half_Story_Finished_All_Ages","1.5 Story PUD" = "One_and_Half_Story_PUD_All_Ages","1.5 Story Unfinished" = "One_and_Half_Story_Unfinished_All_Ages","1 Story < 1946" = "One_Story_1945_and_Older","1 Story 1946+" = "One_Story_1946_and_Newer_All_Styles","1 Story PUD 1946+" = "One_Story_PUD_1946_and_Newer","1 Story Finished Attic" = "One_Story_with_Finished_Attic_All_Ages","PUD Multi/Split Level Foyer" = "PUD_Multilevel_Split_Level_Foyer","Split Level Foyer" = "Split_Foyer","Split/Multilevel" = "Split_or_Multilevel","2.5 Story" = "Two_and_Half_Story_All_Ages","2 Story Family Conversion" = "Two_Family_conversion_All_Styles_and_Ages","2 Story < 1946" = "Two_Story_1945_and_Older","2 Story 1946+" = "Two_Story_1946_and_Newer","2 Story PUD 1946+" = "Two_Story_PUD_1946_and_Newer"))
+```
+
+```{r}
+#esquisser(AmesFinal)
+```
+
+```{r levels to reorder Graphs}
+lvls = names(sort(tapply(AmesFinal$Above_Median == "Yes", AmesFinal$Neighborhood, mean)))
+
+lvls2 = names(sort(tapply(AmesFinal$Above_Median == "Yes", AmesFinal$Sale_Type, mean)))
+
+lvls3 = names(sort(tapply(AmesFinal$Above_Median == "Yes", AmesFinal$Overall_Qual, mean)))
+
+lvls4 = names(sort(tapply(AmesFinal$Above_Median == "Yes", AmesFinal$Exter_Qual, mean)))
+
+lvls5 = names(sort(tapply(AmesFinal$Above_Median == "Yes", AmesFinal$Kitchen_Qual, mean)))
+
+lvls6 = names(sort(tapply(AmesFinal$Above_Median == "Yes", AmesFinal$MS_SubClass, mean)))
+```
+
+```{r Neighborhood}
+ggplot(AmesFinal) +
+  aes(factor(x = Neighborhood, levels = lvls), fill = Above_Median) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = percent) +
+  scale_fill_hue(direction = 1) +
+  labs(
+    title = "Neighborhood",
+    fill = "Above Median"
+  ) +
+  coord_flip() +
+  theme_minimal() +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5),
+        axis.title.y=element_blank(),
+        axis.title.x=element_blank())
+```
+
+```{r Sale Type}
+ggplot(AmesFinal) +
+  aes(factor(x = Sale_Type, levels = lvls2), fill = Above_Median) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = percent) +
+  scale_fill_hue(direction = 1) +
+  labs(
+    title = "Sale Type",
+    fill = "Above Median"
+  ) +
+  coord_flip() +
+  theme_minimal() +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5),
+        axis.title.y=element_blank(),
+        axis.title.x=element_blank())
+```
+
+```{r Year Built}
+ggplot(AmesFinal) +
+  aes(x = Year_Built, fill = Above_Median) +
+  geom_histogram(bins = 20L) +
+  scale_fill_hue(direction = 1) +
+  labs(
+    title = "Year Built",
+    fill = "Above Median",
+    y = "Count of Sales"
+  )+
+  theme_minimal()+
+  theme(plot.title = element_text(face = "bold", hjust = 0.5),
+        axis.title.x=element_blank(),
+        axis.title.y = element_text(margin = margin(t=0, r=20, b=0, l=0)))
+```
+
+```{r OVerall Quality}
+ggplot(AmesFinal) +
+  aes(factor(x = Overall_Qual, levels = lvls3), fill = Above_Median) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = percent) +
+  scale_fill_hue(direction = 1) +
+  labs(
+    title = "Overall Quality",
+    fill = "Above Median"
+  ) +
+  coord_flip() +
+  theme_minimal() +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5),
+        axis.title.y=element_blank(),
+        axis.title.x=element_blank())
+```
+
+```{r Exterior Quality}
+ggplot(AmesFinal) +
+  aes(factor(x = Exter_Qual, levels = lvls4), fill = Above_Median) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = percent) +
+  scale_fill_hue(direction = 1) +
+  labs(
+    title = "Exterier Quality",
+    fill = "Above Median"
+  ) +
+  coord_flip() +
+  theme_minimal() +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5),
+        axis.title.y=element_blank(),
+        axis.title.x=element_blank())
+```
+
+```{r Kitchen Quality}
+ggplot(AmesFinal) +
+  aes(factor(x = Kitchen_Qual, levels = lvls5), fill = Above_Median) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = percent) +
+  scale_fill_hue(direction = 1) +
+  labs(
+    title = "Kitchen Quality",
+    fill = "Above Median"
+  ) +
+  coord_flip() +
+  theme_minimal() +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5),
+        axis.title.y=element_blank(),
+        axis.title.x=element_blank())
+```
+
+```{r Full Bath}
+ggplot(AmesFinal) +
+  aes(x = Full_Bath, fill = Above_Median) +
+  geom_bar() +
+  scale_fill_hue(direction = 1) +
+  labs(
+    title = "# of Full Baths",
+    fill = "Above Median",
+    y = "Count of Sales"
+  ) +
+  theme_minimal() +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5),
+        axis.title.x=element_blank(),
+        axis.title.y = element_text(margin = margin(t=0, r=20, b=0, l=0)))
+```
+
+```{r Rooms Above Ground}
+ggplot(AmesFinal) +
+  aes(x = TotRms_AbvGrd, fill = Above_Median) +
+  geom_bar() +
+  scale_fill_hue(direction = 1) +
+  labs(
+    title = "Total Rooms Above Ground",
+    fill = "Above Median",
+    y = "Count of Sales"
+  ) +
+  theme_minimal() +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5),
+        axis.title.x=element_blank(),
+        axis.title.y = element_text(margin = margin(t=0, r=20, b=0, l=0)))
+```
+
+```{r MS Sub Class}
+ggplot(AmesFinal) +
+  aes(factor(x = MS_SubClass, levels = lvls6), fill = Above_Median) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = percent) +
+  scale_fill_hue(direction = 1) +
+  labs(
+    title = "Dwelling Type",
+    fill = "Above Median"
+  ) +
+  coord_flip() +
+  theme_minimal() +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5),
+        axis.title.y=element_blank(),
+        axis.title.x=element_blank())
+```
+

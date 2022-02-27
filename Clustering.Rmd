@@ -1,0 +1,185 @@
+---
+output:
+  word_document: default
+  html_document: default
+---
+# **Module 6 - Clustering**  
+**Alex Deese**  
+
+```{r}
+library(tidyverse)
+library(tidymodels)
+```
+
+```{r}
+trucks = read_csv("trucks.csv")
+```
+
+## **Task 1: Describe the relationship between distance and speeding.  Does there appear to be any natural clustering of drivers?**  
+
+It appears that drivers that drive longer distances in a day tend to speed more often as we can see the data points increase in y-value as they move left to right along the x axis.  There appears to be natural clustering where drivers tend to drive an average of 20-75 miles per day **OR** an average of 150-225 miles per day.  There are not many drivers that drive outside of those two averages, so we see two main clusters appearing naturally in the data. There also appears to be clustering between drivers that speed between 0-25% of the time **OR** 25-100% of the time though that varies slightly between the two distance groups.  
+
+```{r}
+ggplot(trucks, aes( x = Distance, y = Speeding)) + geom_point() + theme_bw()
+```
+
+## **Task 2: Create a new data frame called "trucks_cleaned" containing the scaled and centered data**  
+
+```{r}
+kmeans_recipe = recipe(~ Distance + Speeding, trucks)
+
+trucks_dummy = kmeans_recipe %>%
+  step_scale(all_numeric()) %>%
+  step_center(all_numeric())
+
+trucks_dummy = prep(trucks_dummy, trucks)
+
+trucks_cleaned = bake(trucks_dummy, trucks)
+```
+
+## **Task 3: Use k-Means clustering with 2 clusters to cluster the "trucks_cleaned" data frame.  Random Seed = 64. Use augment to add the resulting clusters object to the "trucks" data frame. Design a visualization for the clusters and comment on them.**  
+
+These clusters make sense because there is a pretty clear difference in the two clusters.  The red cluster contains drivers that drive an average distance of 0-120.  The blue cluster contains drivers that drive an average of about 122-250.  There are 2 data points that are outliers that fall close to the middle of the two clusters.  If we used more clusters, 4 clusters may be best as both current clusters have grouping with a lower % to speed and a higher % to speed.  Clustering by 4 would split the data into four quadrants.  
+
+```{r}
+set.seed(64)
+clusts = 
+  tibble(k = 1:2) %>%
+  mutate(
+    kclust = map(k, ~kmeans(trucks_cleaned, .x)),
+    tidied = map(kclust, tidy),
+    glanced = map(kclust, glance),
+    augmented = map(kclust, augment, trucks_cleaned))
+
+clusts
+```
+
+```{r}
+clusters = 
+  clusts %>%
+  unnest(cols = c(tidied))
+
+assignments = clusts %>%
+  unnest(cols = c(augmented))
+
+clusterings = 
+  clusts %>%
+  unnest(cols = c(glanced))
+```
+
+```{r}
+set.seed(64)
+clusters = kmeans(trucks_cleaned, 2)
+```
+
+
+```{r}
+trucks = augment(clusters,trucks)
+
+str(trucks)
+```
+
+```{r}
+ggplot(trucks, aes(x = Distance, y = Speeding, color =factor(.cluster))) + geom_point()
+```
+
+## **Task 4: Create a visualization to show how the cluster appear from values of k from 1 to 8.  Random # seed = 412.  Which value of k appears to be most appropriate for this data?**  
+
+The k value of 4 appears to be most appropriate for this data.  
+
+```{r}
+set.seed(412)
+clusts = 
+  tibble(k = 1:8) %>%
+  mutate(
+    kclust = map(k, ~kmeans(trucks_cleaned, .x)),
+    tidied = map(kclust, tidy),
+    glanced = map(kclust, glance),
+    augmented = map(kclust, augment, trucks_cleaned))
+```
+
+```{r}
+clusters = 
+  clusts %>%
+  unnest(cols = c(tidied))
+
+assignments = clusts %>%
+  unnest(cols = c(augmented))
+
+clusterings = 
+  clusts %>%
+  unnest(cols = c(glanced))
+```
+
+```{r}
+p1 = ggplot(assignments, aes(x = Distance, y = Speeding)) +
+  geom_point(aes(color = .cluster), alpha = 0.8) + 
+  facet_wrap(~ k)
+
+p1
+```
+
+## **Task 5: Create a plot of k versus within cluster sum of squares.  Which value of k appears to be best?**  
+
+A k value of 4 appears to be best.  
+
+```{r}
+ggplot(clusterings, aes(k, tot.withinss)) +
+  geom_line() +
+  geom_point() + theme_bw()
+```
+
+## **Task 6: Repeat Task 3 for the # of clusters identified in task 5.  Use the same random # seed and include a visualization.  Comment on the resulting clusters.**  
+
+The visualization of 4 clusters looks to represent the grouping of the data more accurately than 2.  The data is split between four quadrants.  
+
+**Red** shows drivers that drive an average of about 20-120 miles per day that speed between 0-17% of the time.  
+
+**Blue** shows drivers that drive an average of about 20-90 miles per day that speed between about 18-64% of the time.  
+
+**Purple** shows drivers that drive an average of 122-140 miles per day that speed 0-38% of the time.  
+
+**Green** shows drivers that drive an average of 122-240 miles per day and speed 39-100% of the time.  
+
+
+```{r}
+set.seed(64)
+clusts = 
+  tibble(k = 4) %>%
+  mutate(
+    kclust = map(k, ~kmeans(trucks_cleaned, .x)),
+    tidied = map(kclust, tidy),
+    glanced = map(kclust, glance),
+    augmented = map(kclust, augment, trucks_cleaned))
+
+clusts
+```
+
+```{r}
+clusters = 
+  clusts %>%
+  unnest(cols = c(tidied))
+
+assignments = clusts %>%
+  unnest(cols = c(augmented))
+
+clusterings = 
+  clusts %>%
+  unnest(cols = c(glanced))
+```
+
+```{r}
+set.seed(64)
+clusters = kmeans(trucks_cleaned, 4)
+```
+
+```{r}
+trucks = augment(clusters,trucks)
+
+str(trucks)
+```
+
+```{r}
+ggplot(trucks, aes(x = Distance, y = Speeding, color =factor(.cluster))) + geom_point()
+```
+

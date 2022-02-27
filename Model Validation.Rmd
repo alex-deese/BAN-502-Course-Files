@@ -1,0 +1,76 @@
+---
+output:
+  word_document: default
+  html_document: default
+---
+# **Module 3 - Assignment 1 - Model Validation**  
+## **Alex Deese**  
+
+```{r}
+library(tidyverse)
+library(lubridate)
+library(tidymodels)
+```
+
+```{r}
+bike = read_csv("bike_cleaned-2.csv")
+bike = bike %>% mutate(dteday = mdy(dteday))
+bike = bike %>% mutate_if(is.character, as_factor)
+bike = bike %>% mutate(hr = as_factor(hr))
+```
+
+## **Task 1: Split the data into training and testing sets.**  
+
+```{r}
+set.seed(1234)
+bike_split = initial_split(bike, prop = 0.70, strata = count)
+train = training(bike_split)
+test = testing(bike_split)
+```
+
+## **Task 2: How many rows of data are in each set?**  
+There are 5,216 rows in the test set and 12,163 rows in the training set.  
+
+## **Task 3: Build a linear regression model to predict "count" using the variables "season", "mnth", "hr", "holiday", "weekday", "temp"', and "weathersit".  Comment on the quality of the model.**  
+
+This model is not bad.  Most of the variables are significant, other than many of the weekdays (though Sunday/Monday are significant).  The Adjusted R-squared value is 0.6209 which could be higher but is not terrible.  
+
+```{r}
+bike_recipe = recipe(count ~., train) %>%
+  step_rm(instant,dteday,workingday,atemp,hum,windspeed,registered,casual) %>%
+  step_dummy(all_nominal())
+
+lm_model =
+  linear_reg() %>%
+  set_engine("lm")
+
+lm_wflow =
+  workflow() %>%
+  add_model(lm_model) %>%
+  add_recipe(bike_recipe)
+
+lm_fit = fit(lm_wflow, train)
+summary(lm_fit$fit$fit$fit)
+
+```
+
+## **Task 4: Use the predict function to make predictions on the training set. Develop a histogram and comment on the distributions of the predictions.**   
+
+The distributions of the predictions on the histogram are relatively normal.  We see a bell-shaped curve, though there is a slight dip in the middle.  Overall, the distribution of predictions is consistent with what we would want to see.  
+
+```{r}
+predict_train = predict(lm_fit, train)
+```
+
+```{r}
+ggplot(predict_train, aes(x = .pred)) + geom_histogram() + theme_bw()
+```
+
+## **Task 5: Determine the R-squared value of the model on the testing set.  Comment on how this compares to the model's performance on the testing set.**  
+
+The R-squared value on the testing set is 0.627 and 0.621 on the training set.  These are close in value so the model is performing similarly on both the training and test sets.  
+
+```{r}
+lm_fit %>% predict(test) %>% bind_cols(test) %>% metrics(truth = count, estimate = .pred)
+```
+
